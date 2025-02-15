@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisa Perilaku Konsumen Produk di Daerahmu</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 5px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        input[type="text"], select {
+            width: 60%;
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #357abd;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 10px;
+        }
+        .suggestion {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            margin: 3px 0;
+        }
+        .options {
+            margin: 15px 0;
+        }
+        .copy-btn {
+            background-color: #34a853;
+        }
+        .copy-btn:hover {
+            background-color: #2a7e3f;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        .copy-container {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 10px 0;
+            z-index: 1;
+            border-bottom: 2px solid #eee;
+        }
+        .suggestions-list {
+            max-height: 500px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Analisa Perilaku Konsumen Produk di Daerahmu</h2>
+        <div class="options">
+            <input type="text" id="keyword" placeholder="masukan Produk dan kota...">
+            <div style="margin:10px 0">
+                <select id="language">
+                    <option value="id">Indonesia</option>
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                </select>
+                <select id="country">
+                    <option value="ID">Indonesia</option>
+                    <option value="US">USA</option>
+                    <option value="GB">UK</option>
+                </select>
+            </div>
+        </div>
+        <button onclick="getAllSuggestions()">Mulai Analisa</button>
+        <div id="results"></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('');
+        let allSuggestions = new Set();
+
+        async function getAllSuggestions() {
+            const keyword = $('#keyword').val().trim();
+            if(!keyword) {
+                alert('Silahkan masukkan keyword!');
+                return;
+            }
+            
+            const lang = $('#language').val();
+            const country = $('#country').val();
+            
+            allSuggestions.clear();
+            $('#results').html('<div class="loading">Memulai proses Analisa...</div>');
+            
+            const baseParams = [
+                {client: 'firefox', ds: 'gs'},
+                {client: 'chrome', ds: ''},
+                {client: 'toolbar', ds: 'sb'}
+            ];
+
+            for(const params of baseParams) {
+                await getVariations(keyword, lang, country, params);
+            }
+            
+            showResults();
+        }
+
+        async function getVariations(keyword, lang, country, params) {
+            const variations = ['', ' ', ...alphabet];
+            
+            for(const char of variations) {
+                const query = `${keyword} ${char}`.trim();
+                const url = `https://www.google.com/complete/search` + 
+                          `?q=${encodeURIComponent(query)}` +
+                          `&client=${params.client}` +
+                          `&hl=${lang}` +
+                          `&gl=${country}` +
+                          `&ds=${params.ds}` +
+                          `&callback=?`;
+                
+                try {
+                    const data = await $.ajax({
+                        url: url,
+                        dataType: 'jsonp',
+                        jsonp: 'callback'
+                    });
+                    
+                    if(data?.[1]) {
+                        data[1].forEach(suggestion => {
+                            const cleanSuggestion = suggestion
+                                .replace(/<\/?b>/g, '')
+                                .trim();
+                            allSuggestions.add(cleanSuggestion);
+                        });
+                    }
+                } catch(error) {
+                    console.log('Error:', error);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+
+        function showResults() {
+            const suggestions = Array.from(allSuggestions).sort();
+            let html = `
+                <div class="copy-container">
+                    <h3>Total ${suggestions.length} Saran Ditemukan</h3>
+                    ${suggestions.length > 0 ? 
+                      '<button class="copy-btn" onclick="copyResults()">Salin Semua Saran</button>' : 
+                      ''}
+                </div>
+                <div class="suggestions-list">
+            `;
+            
+            suggestions.forEach((suggestion, index) => {
+                html += `<div class="suggestion">${index + 1}. ${suggestion}</div>`;
+            });
+            
+            html += `</div>`; // Tutup div suggestions-list
+            
+            $('#results').html(html);
+        }
+
+        function copyResults() {
+            const suggestions = Array.from(allSuggestions).sort();
+            const textToCopy = suggestions.join('\n');
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                alert(`Berhasil disalin ${suggestions.length} saran ke clipboard!`);
+            }).catch(err => {
+                alert('Gagal menyalin teks!');
+                console.error(err);
+            });
+        }
+    </script>
+</body>
+</html>
